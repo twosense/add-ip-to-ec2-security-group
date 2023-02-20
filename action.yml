@@ -1,0 +1,37 @@
+name: 'Add IP address to EC2 security group'
+description: 'Add IP address and port to EC2 security group. 
+This action assumes that the AWS CLI is already installed and configured.'
+
+inputs:
+  ip:
+    description: 'IP address to add'
+    required: true
+  port:
+    description: 'Port to open'
+    required: true
+  protocol:
+    description: 'Protocol to open'
+    required: true
+    default: 'tcp'
+  security-group-id:
+    description: 'Security group ID'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        aws ec2 authorize-security-group-ingress \
+          --group-id ${{ inputs.security-group-id }} \
+          --protocol ${{ inputs.protocol }} \
+          --port ${{ inputs.port }} \
+          --cidr ${{ inputs.ip }}/32
+      shell: bash
+    - name: Cleanup
+      if: always()
+      run: |
+        aws ec2 revoke-security-group-ingress \
+          --group-id ${{ inputs.security-group-id }} \
+          --protocol ${{ inputs.protocol }} \
+          --port ${{ inputs.port }} \
+          --cidr ${{ inputs.ip }}/32
+      shell: bash
