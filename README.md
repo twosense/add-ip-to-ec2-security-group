@@ -3,7 +3,9 @@
 This action adds an IP address on a specific port to an EC2 security group.
 If no IP address is provided, the action will use the IP address of the machine running the action.
 
-This action assumes that the AWS CLI is installed and configured.
+The post action will remove the IP address from the security group.
+
+_Note: this action assumes that the AWS CLI is installed and configured previously in the workflow._
 
 ## Inputs
 ______________
