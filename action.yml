@@ -17,21 +17,5 @@ inputs:
     description: 'Security group ID'
     required: true
 runs:
-  using: "composite"
-  steps:
-    - run: |
-        aws ec2 authorize-security-group-ingress \
-          --group-id ${{ inputs.security-group-id }} \
-          --protocol ${{ inputs.protocol }} \
-          --port ${{ inputs.port }} \
-          --cidr ${{ inputs.ip }}/32
-      shell: bash
-    - name: Cleanup
-      if: always()
-      run: |
-        aws ec2 revoke-security-group-ingress \
-          --group-id ${{ inputs.security-group-id }} \
-          --protocol ${{ inputs.protocol }} \
-          --port ${{ inputs.port }} \
-          --cidr ${{ inputs.ip }}/32
-      shell: bash
+  using: 'node16'
+  main: 'index.js'
