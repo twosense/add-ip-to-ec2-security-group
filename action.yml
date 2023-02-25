@@ -1,11 +1,12 @@
 name: 'Add IP address to EC2 security group'
 description: 'Add IP address and port to EC2 security group. 
-This action assumes that the AWS CLI is already installed and configured.'
+This action assumes that the AWS CLI is already installed and configured.
+If no IP address is provided, the action will use the IP address of the runner.'
 
 inputs:
   ip:
     description: 'IP address to add'
-    required: true
+    required: false
   port:
     description: 'Port to open'
     required: true

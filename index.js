@@ -1,14 +1,10 @@
 const core = require('@actions/core');
 const {EC2Client, AuthorizeSecurityGroupIngressCommand} = require("@aws-sdk/client-ec2");
-const {makeParams} = require("./utils");
+const {makeParams, getActionInputs} = require("./utils");
 
 try {
-    const ip = core.getInput('ip');
-    const protocol = core.getInput('protocol');
-    const port = core.getInput('port');
-    const securityGroupId = core.getInput('security-group-id');
-
-    const params = makeParams(securityGroupId, protocol, port, ip);
+    const inputs = getActionInputs(core);
+    const params = makeParams(inputs);
 
     const client = new EC2Client({region: process.env.AWS_REGION});
     const command = new AuthorizeSecurityGroupIngressCommand(params);
