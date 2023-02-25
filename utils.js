@@ -1,30 +1,27 @@
-async function getActionInputs(core) {
+async function getActionInputs() {
+    const core = await import('@actions/core');
+    const {publicIpv4} = await import("public-ip");
+
     let ip = core.getInput('ip');
     const protocol = core.getInput('protocol');
     const port = core.getInput('port');
     const securityGroupId = core.getInput('security-group-id');
 
-    if (!ip)
-        ip = await getPublicIp();
+    if (!ip) {
+        ip = await publicIpv4();
+        console.info("No IP provided, using public IP: " + ip)
+    }
 
     return {ip, protocol, port, securityGroupId};
 }
 
-async function getPublicIp() {
-    const {publicIpv4} = await import("public-ip");
-    const ip = await publicIpv4();
-
-    console.debug(`Public IP: ${ip}`);
-    return ip;
-}
-
-function makeParams(ip, protocol, port, securityGroupId) {
+function makeParams(inputs) {
     return {
-        GroupId: securityGroupId,
-        IpProtocol: protocol,
-        FromPort: parseInt(port),
-        ToPort: parseInt(port),
-        CidrIp: ip + '/32',
+        GroupId: inputs.securityGroupId,
+        IpProtocol: inputs.protocol,
+        FromPort: parseInt(inputs.port),
+        ToPort: parseInt(inputs.port),
+        CidrIp: inputs.ip + '/32',
     };
 }
 
