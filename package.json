@@ -4,7 +4,7 @@
   "description": "Authorize an IP address to an EC2 security group.",
   "main": "index.js",
   "scripts": {
-    "build": "ncc build index.js -o dist/  --license licenses.txt && ncc build post.js -o dist/cleanup/ --license licenses.txt",
+    "build": "rm -rf dist/ && ncc build index.js -o dist/  --license licenses.txt && ncc build post.js -o dist/cleanup/ --license licenses.txt",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
