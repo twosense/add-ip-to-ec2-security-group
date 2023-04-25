@@ -1,0 +1,23 @@
+name: 'Add IP address to EC2 security group'
+description: 'Add IP address and port to EC2 security group. 
+This action assumes that the AWS CLI is already installed and configured.
+If no IP address is provided, the action will use the IP address of the runner.'
+
+inputs:
+  ip:
+    description: 'IP address to add'
+    required: false
+  port:
+    description: 'Port to open'
+    required: true
+  protocol:
+    description: 'Protocol to open'
+    required: true
+    default: 'tcp'
+  security-group-id:
+    description: 'Security group ID'
+    required: true
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
+  post: 'dist/cleanup/index.js'
