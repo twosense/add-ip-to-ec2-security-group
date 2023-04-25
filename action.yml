@@ -1,8 +1,9 @@
 name: 'Add IP address to EC2 security group'
 description: 'Add IP address and port to EC2 security group. 
 This action assumes that the AWS CLI is already installed and configured.'
-icon: check-circle
-color: green
+branding:
+  icon: check-circle
+  color: green
 
 inputs:
   ip:
