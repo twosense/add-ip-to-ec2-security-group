@@ -9,12 +9,11 @@ async function cleanUp() {
 
         const client = new EC2Client({region: process.env.AWS_REGION});
         const command = new RevokeSecurityGroupIngressCommand(params);
-        client.send(command).then(response => {
-            console.debug(response)
-        });
 
+        const response = client.send(command);
+        core.debug(response);
     } catch (error) {
-        core.setFailed(error.message);
+        core.setFailed(error);
     }
 }
 
