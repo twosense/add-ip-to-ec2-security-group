@@ -9,12 +9,11 @@ async function main() {
 
         const client = new EC2Client({region: process.env.AWS_REGION});
         const command = new AuthorizeSecurityGroupIngressCommand(params);
-        client.send(command).then(response => {
-            console.debug(response)
-        });
 
+        const response = await client.send(command);
+        core.debug(response);
     } catch (error) {
-        core.setFailed(error.message);
+        core.setFailed(error);
     }
 }
 
