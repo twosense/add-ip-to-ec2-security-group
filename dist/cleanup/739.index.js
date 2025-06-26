@@ -1,15 +1,15 @@
-exports.id = 340;
-exports.ids = [340];
+exports.id = 739;
+exports.ids = [739];
 exports.modules = {
 
-/***/ 25578:
+/***/ 1373:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {Transform, PassThrough} = __webpack_require__(12781);
-const zlib = __webpack_require__(59796);
-const mimicResponse = __webpack_require__(52166);
+const {Transform, PassThrough} = __webpack_require__(2203);
+const zlib = __webpack_require__(3106);
+const mimicResponse = __webpack_require__(9382);
 
 module.exports = response => {
 	const contentEncoding = (response.headers['content-encoding'] || '').toLowerCase();
@@ -68,7 +68,7 @@ module.exports = response => {
 
 /***/ }),
 
-/***/ 52166:
+/***/ 9382:
 /***/ ((module) => {
 
 "use strict";
@@ -153,7 +153,7 @@ module.exports = (fromStream, toStream) => {
 
 /***/ }),
 
-/***/ 50969:
+/***/ 2114:
 /***/ ((module, exports) => {
 
 "use strict";
@@ -208,7 +208,7 @@ module.exports["default"] = deferToConnect;
 
 /***/ }),
 
-/***/ 70775:
+/***/ 1630:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -239,19 +239,19 @@ exports.toClass = function (name) {
 
 /***/ }),
 
-/***/ 64489:
+/***/ 4894:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
 "use strict";
 
 
-const Buffer = (__webpack_require__(14300).Buffer)
-const types = __webpack_require__(43008)
-const rcodes = __webpack_require__(71616)
-const opcodes = __webpack_require__(92870)
-const classes = __webpack_require__(70775)
-const optioncodes = __webpack_require__(11620)
-const ip = __webpack_require__(74774)
+const Buffer = (__webpack_require__(181).Buffer)
+const types = __webpack_require__(1891)
+const rcodes = __webpack_require__(2028)
+const opcodes = __webpack_require__(4693)
+const classes = __webpack_require__(1630)
+const optioncodes = __webpack_require__(2075)
+const ip = __webpack_require__(4550)
 
 const QUERY_FLAG = 0
 const RESPONSE_FLAG = 1 << 15
@@ -262,7 +262,7 @@ const NOT_QU_MASK = ~QU_MASK
 
 const name = exports.name = {}
 
-name.encode = function (str, buf, offset) {
+name.encode = function (str, buf, offset, { mail = false } = {}) {
   if (!buf) buf = Buffer.alloc(name.encodingLength(str))
   if (!offset) offset = 0
   const oldOffset = offset
@@ -270,7 +270,23 @@ name.encode = function (str, buf, offset) {
   // strip leading and trailing .
   const n = str.replace(/^\.|\.$/gm, '')
   if (n.length) {
-    const list = n.split('.')
+    let list = []
+    if (mail) {
+      let localPart = ''
+      n.split('.').forEach(label => {
+        if (label.endsWith('\\')) {
+          localPart += (localPart.length ? '.' : '') + label.slice(0, -1)
+        } else {
+          if (list.length === 0 && localPart.length) {
+            list.push(localPart + '.' + label)
+          } else {
+            list.push(label)
+          }
+        }
+      })
+    } else {
+      list = n.split('.')
+    }
 
     for (let i = 0; i < list.length; i++) {
       const len = buf.write(list[i], offset + 1)
@@ -287,7 +303,7 @@ name.encode = function (str, buf, offset) {
 
 name.encode.bytes = 0
 
-name.decode = function (buf, offset) {
+name.decode = function (buf, offset, { mail = false } = {}) {
   if (!offset) offset = 0
 
   const list = []
@@ -313,7 +329,11 @@ name.decode = function (buf, offset) {
       if (totalLength > 254) {
         throw new Error('Cannot decode name (name too long)')
       }
-      list.push(buf.toString('utf-8', offset, offset + len))
+      let label = buf.toString('utf-8', offset, offset + len)
+      if (mail) {
+        label = label.replace(/\./g, '\\.')
+      }
+      list.push(label)
       offset += len
       consumedBytes += jumped ? 0 : len
     } else if ((len & 0xc0) === 0xc0) {
@@ -499,7 +519,7 @@ rsoa.encode = function (data, buf, offset) {
   offset += 2
   name.encode(data.mname, buf, offset)
   offset += name.encode.bytes
-  name.encode(data.rname, buf, offset)
+  name.encode(data.rname, buf, offset, { mail: true })
   offset += name.encode.bytes
   buf.writeUInt32BE(data.serial || 0, offset)
   offset += 4
@@ -528,7 +548,7 @@ rsoa.decode = function (buf, offset) {
   offset += 2
   data.mname = name.decode(buf, offset)
   offset += name.decode.bytes
-  data.rname = name.decode(buf, offset)
+  data.rname = name.decode(buf, offset, { mail: true })
   offset += name.decode.bytes
   data.serial = buf.readUInt32BE(offset)
   offset += 4
@@ -1252,7 +1272,7 @@ rrp.encode = function (data, buf, offset) {
   const oldOffset = offset
 
   offset += 2 // Leave space for length
-  name.encode(data.mbox || '.', buf, offset)
+  name.encode(data.mbox || '.', buf, offset, { mail: true })
   offset += name.encode.bytes
   name.encode(data.txt || '.', buf, offset)
   offset += name.encode.bytes
@@ -1269,7 +1289,7 @@ rrp.decode = function (buf, offset) {
 
   const data = {}
   offset += 2
-  data.mbox = name.decode(buf, offset) || '.'
+  data.mbox = name.decode(buf, offset, { mail: true }) || '.'
   offset += name.decode.bytes
   data.txt = name.decode(buf, offset) || '.'
   offset += name.decode.bytes
@@ -1598,6 +1618,116 @@ rsshfp.encodingLength = function (record) {
   return 4 + Buffer.from(record.fingerprint, 'hex').byteLength
 }
 
+const rnaptr = exports.naptr = {}
+
+rnaptr.encode = function (data, buf, offset) {
+  if (!buf) buf = Buffer.alloc(rnaptr.encodingLength(data))
+  if (!offset) offset = 0
+  const oldOffset = offset
+  offset += 2
+  buf.writeUInt16BE(data.order || 0, offset)
+  offset += 2
+  buf.writeUInt16BE(data.preference || 0, offset)
+  offset += 2
+  string.encode(data.flags, buf, offset)
+  offset += string.encode.bytes
+  string.encode(data.services, buf, offset)
+  offset += string.encode.bytes
+  string.encode(data.regexp, buf, offset)
+  offset += string.encode.bytes
+  name.encode(data.replacement, buf, offset)
+  offset += name.encode.bytes
+  rnaptr.encode.bytes = offset - oldOffset
+  buf.writeUInt16BE(rnaptr.encode.bytes - 2, oldOffset)
+  return buf
+}
+
+rnaptr.encode.bytes = 0
+
+rnaptr.decode = function (buf, offset) {
+  if (!offset) offset = 0
+  const oldOffset = offset
+  const data = {}
+  offset += 2
+  data.order = buf.readUInt16BE(offset)
+  offset += 2
+  data.preference = buf.readUInt16BE(offset)
+  offset += 2
+  data.flags = string.decode(buf, offset)
+  offset += string.decode.bytes
+  data.services = string.decode(buf, offset)
+  offset += string.decode.bytes
+  data.regexp = string.decode(buf, offset)
+  offset += string.decode.bytes
+  data.replacement = name.decode(buf, offset)
+  offset += name.decode.bytes
+  rnaptr.decode.bytes = offset - oldOffset
+  return data
+}
+
+rnaptr.decode.bytes = 0
+
+rnaptr.encodingLength = function (data) {
+  return string.encodingLength(data.flags) +
+    string.encodingLength(data.services) +
+    string.encodingLength(data.regexp) +
+    name.encodingLength(data.replacement) + 6
+}
+
+const rtlsa = exports.tlsa = {}
+
+rtlsa.encode = function (cert, buf, offset) {
+  if (!buf) buf = Buffer.alloc(rtlsa.encodingLength(cert))
+  if (!offset) offset = 0
+  const oldOffset = offset
+
+  const certdata = cert.certificate
+  if (!Buffer.isBuffer(certdata)) {
+    throw new Error('Certificate must be a Buffer')
+  }
+
+  offset += 2 // Leave space for length
+  buf.writeUInt8(cert.usage, offset)
+  offset += 1
+  buf.writeUInt8(cert.selector, offset)
+  offset += 1
+  buf.writeUInt8(cert.matchingType, offset)
+  offset += 1
+  certdata.copy(buf, offset, 0, certdata.length)
+  offset += certdata.length
+
+  rtlsa.encode.bytes = offset - oldOffset
+  buf.writeUInt16BE(rtlsa.encode.bytes - 2, oldOffset)
+  return buf
+}
+
+rtlsa.encode.bytes = 0
+
+rtlsa.decode = function (buf, offset) {
+  if (!offset) offset = 0
+  const oldOffset = offset
+
+  const cert = {}
+  const length = buf.readUInt16BE(offset)
+  offset += 2
+  cert.usage = buf.readUInt8(offset)
+  offset += 1
+  cert.selector = buf.readUInt8(offset)
+  offset += 1
+  cert.matchingType = buf.readUInt8(offset)
+  offset += 1
+  cert.certificate = buf.slice(offset, oldOffset + length + 2)
+  offset += cert.certificate.length
+  rtlsa.decode.bytes = offset - oldOffset
+  return cert
+}
+
+rtlsa.decode.bytes = 0
+
+rtlsa.encodingLength = function (cert) {
+  return 5 + Buffer.byteLength(cert.certificate)
+}
+
 const renc = exports.record = function (type) {
   switch (type.toUpperCase()) {
     case 'A': return ra
@@ -1621,6 +1751,8 @@ const renc = exports.record = function (type) {
     case 'NSEC3': return rnsec3
     case 'SSHFP': return rsshfp
     case 'DS': return rds
+    case 'NAPTR': return rnaptr
+    case 'TLSA': return rtlsa
   }
   return runknown
 }
@@ -1876,7 +2008,7 @@ function decodeList (list, enc, buf, offset) {
 
 /***/ }),
 
-/***/ 92870:
+/***/ 4693:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -1934,7 +2066,7 @@ exports.toOpcode = function (code) {
 
 /***/ }),
 
-/***/ 11620:
+/***/ 2075:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -2001,7 +2133,7 @@ exports.toCode = function (name) {
 
 /***/ }),
 
-/***/ 71616:
+/***/ 2028:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -2059,7 +2191,7 @@ exports.toRcode = function (code) {
 
 /***/ }),
 
-/***/ 43008:
+/***/ 1891:
 /***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
@@ -2170,16 +2302,16 @@ exports.toType = function (name) {
 
 /***/ }),
 
-/***/ 42022:
+/***/ 6791:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-const dgram = __webpack_require__(71891)
-const util = __webpack_require__(73837)
-const packet = __webpack_require__(64489)
-const events = __webpack_require__(82361)
+const dgram = __webpack_require__(7194)
+const util = __webpack_require__(9023)
+const packet = __webpack_require__(4894)
+const events = __webpack_require__(4434)
 
 module.exports = DNS
 
@@ -2465,12 +2597,12 @@ function isListening (socket) {
 
 /***/ }),
 
-/***/ 64038:
+/***/ 7070:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {PassThrough: PassThroughStream} = __webpack_require__(12781);
+const {PassThrough: PassThroughStream} = __webpack_require__(2203);
 
 module.exports = options => {
 	options = {...options};
@@ -2525,15 +2657,15 @@ module.exports = options => {
 
 /***/ }),
 
-/***/ 61641:
+/***/ 6771:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {constants: BufferConstants} = __webpack_require__(14300);
-const stream = __webpack_require__(12781);
-const {promisify} = __webpack_require__(73837);
-const bufferStream = __webpack_require__(64038);
+const {constants: BufferConstants} = __webpack_require__(181);
+const stream = __webpack_require__(2203);
+const {promisify} = __webpack_require__(9023);
+const bufferStream = __webpack_require__(7070);
 
 const streamPipelinePromisified = promisify(stream.pipeline);
 
@@ -2594,12 +2726,29 @@ module.exports.MaxBufferError = MaxBufferError;
 
 /***/ }),
 
-/***/ 11918:
+/***/ 4584:
 /***/ ((module) => {
 
 "use strict";
 
-// rfc7231 6.1
+
+/**
+ * @typedef {Object} HttpRequest
+ * @property {Record<string, string>} headers - Request headers
+ * @property {string} [method] - HTTP method
+ * @property {string} [url] - Request URL
+ */
+
+/**
+ * @typedef {Object} HttpResponse
+ * @property {Record<string, string>} headers - Response headers
+ * @property {number} [status] - HTTP status code
+ */
+
+/**
+ * Set of default cacheable status codes per RFC 7231 section 6.1.
+ * @type {Set<number>}
+ */
 const statusCodeCacheableByDefault = new Set([
     200,
     203,
@@ -2615,7 +2764,11 @@ const statusCodeCacheableByDefault = new Set([
     501,
 ]);
 
-// This implementation does not understand partial responses (206)
+/**
+ * Set of HTTP status codes that the cache implementation understands.
+ * Note: This implementation does not understand partial responses (206).
+ * @type {Set<number>}
+ */
 const understoodStatuses = new Set([
     200,
     203,
@@ -2633,13 +2786,21 @@ const understoodStatuses = new Set([
     501,
 ]);
 
+/**
+ * Set of HTTP error status codes.
+ * @type {Set<number>}
+ */
 const errorStatusCodes = new Set([
     500,
     502,
-    503, 
+    503,
     504,
 ]);
 
+/**
+ * Object representing hop-by-hop headers that should be removed.
+ * @type {Record<string, boolean>}
+ */
 const hopByHopHeaders = {
     date: true, // included, because we add Age update Date
     connection: true,
@@ -2652,6 +2813,10 @@ const hopByHopHeaders = {
     upgrade: true,
 };
 
+/**
+ * Headers that are excluded from revalidation update.
+ * @type {Record<string, boolean>}
+ */
 const excludedFromRevalidationUpdate = {
     // Since the old body is reused, it doesn't make sense to change properties of the body
     'content-length': true,
@@ -2660,21 +2825,37 @@ const excludedFromRevalidationUpdate = {
     'content-range': true,
 };
 
+/**
+ * Converts a string to a number or returns zero if the conversion fails.
+ * @param {string} s - The string to convert.
+ * @returns {number} The parsed number or 0.
+ */
 function toNumberOrZero(s) {
     const n = parseInt(s, 10);
     return isFinite(n) ? n : 0;
 }
 
-// RFC 5861
+/**
+ * Determines if the given response is an error response.
+ * Implements RFC 5861 behavior.
+ * @param {HttpResponse|undefined} response - The HTTP response object.
+ * @returns {boolean} true if the response is an error or undefined, false otherwise.
+ */
 function isErrorResponse(response) {
     // consider undefined response as faulty
-    if(!response) {
-        return true
+    if (!response) {
+        return true;
     }
     return errorStatusCodes.has(response.status);
 }
 
+/**
+ * Parses a Cache-Control header string into an object.
+ * @param {string} [header] - The Cache-Control header value.
+ * @returns {Record<string, string|boolean>} An object representing Cache-Control directives.
+ */
 function parseCacheControl(header) {
+    /** @type {Record<string, string|boolean>} */
     const cc = {};
     if (!header) return cc;
 
@@ -2689,6 +2870,11 @@ function parseCacheControl(header) {
     return cc;
 }
 
+/**
+ * Formats a Cache-Control directives object into a header string.
+ * @param {Record<string, string|boolean>} cc - The Cache-Control directives.
+ * @returns {string|undefined} A formatted Cache-Control header string or undefined if empty.
+ */
 function formatCacheControl(cc) {
     let parts = [];
     for (const k in cc) {
@@ -2702,6 +2888,17 @@ function formatCacheControl(cc) {
 }
 
 module.exports = class CachePolicy {
+    /**
+     * Creates a new CachePolicy instance.
+     * @param {HttpRequest} req - Incoming client request.
+     * @param {HttpResponse} res - Received server response.
+     * @param {Object} [options={}] - Configuration options.
+     * @param {boolean} [options.shared=true] - Is the cache shared (a public proxy)? `false` for personal browser caches.
+     * @param {number} [options.cacheHeuristic=0.1] - Fallback heuristic (age fraction) for cache duration.
+     * @param {number} [options.immutableMinTimeToLive=86400000] - Minimum TTL for immutable responses in milliseconds.
+     * @param {boolean} [options.ignoreCargoCult=false] - Detect nonsense cache headers, and override them.
+     * @param {any} [options._fromObject] - Internal parameter for deserialization. Do not use.
+     */
     constructor(
         req,
         res,
@@ -2723,29 +2920,44 @@ module.exports = class CachePolicy {
         }
         this._assertRequestHasHeaders(req);
 
+        /** @type {number} Timestamp when the response was received */
         this._responseTime = this.now();
+        /** @type {boolean} Indicates if the cache is shared */
         this._isShared = shared !== false;
+        /** @type {boolean} Indicates if legacy cargo cult directives should be ignored */
+        this._ignoreCargoCult = !!ignoreCargoCult;
+        /** @type {number} Heuristic cache fraction */
         this._cacheHeuristic =
             undefined !== cacheHeuristic ? cacheHeuristic : 0.1; // 10% matches IE
+        /** @type {number} Minimum TTL for immutable responses in ms */
         this._immutableMinTtl =
             undefined !== immutableMinTimeToLive
                 ? immutableMinTimeToLive
                 : 24 * 3600 * 1000;
 
+        /** @type {number} HTTP status code */
         this._status = 'status' in res ? res.status : 200;
+        /** @type {Record<string, string>} Response headers */
         this._resHeaders = res.headers;
+        /** @type {Record<string, string|boolean>} Parsed Cache-Control directives from response */
         this._rescc = parseCacheControl(res.headers['cache-control']);
+        /** @type {string} HTTP method (e.g., GET, POST) */
         this._method = 'method' in req ? req.method : 'GET';
+        /** @type {string} Request URL */
         this._url = req.url;
+        /** @type {string} Host header from the request */
         this._host = req.headers.host;
+        /** @type {boolean} Whether the request does not include an Authorization header */
         this._noAuthorization = !req.headers.authorization;
+        /** @type {Record<string, string>|null} Request headers used for Vary matching */
         this._reqHeaders = res.headers.vary ? req.headers : null; // Don't keep all request headers if they won't be used
+        /** @type {Record<string, string|boolean>} Parsed Cache-Control directives from request */
         this._reqcc = parseCacheControl(req.headers['cache-control']);
 
         // Assume that if someone uses legacy, non-standard uncecessary options they don't understand caching,
         // so there's no point stricly adhering to the blindly copy&pasted directives.
         if (
-            ignoreCargoCult &&
+            this._ignoreCargoCult &&
             'pre-check' in this._rescc &&
             'post-check' in this._rescc
         ) {
@@ -2771,10 +2983,18 @@ module.exports = class CachePolicy {
         }
     }
 
+    /**
+     * You can monkey-patch it for testing.
+     * @returns {number} Current time in milliseconds.
+     */
     now() {
         return Date.now();
     }
 
+    /**
+     * Determines if the response is storable in a cache.
+     * @returns {boolean} `false` if can never be cached.
+     */
     storable() {
         // The "no-store" request directive indicates that a cache MUST NOT store any part of either this request or any response to it.
         return !!(
@@ -2808,62 +3028,160 @@ module.exports = class CachePolicy {
         );
     }
 
+    /**
+     * @returns {boolean} true if expiration is explicitly defined.
+     */
     _hasExplicitExpiration() {
         // 4.2.1 Calculating Freshness Lifetime
-        return (
+        return !!(
             (this._isShared && this._rescc['s-maxage']) ||
             this._rescc['max-age'] ||
             this._resHeaders.expires
         );
     }
 
+    /**
+     * @param {HttpRequest} req - a request
+     * @throws {Error} if the headers are missing.
+     */
     _assertRequestHasHeaders(req) {
         if (!req || !req.headers) {
             throw Error('Request headers missing');
         }
     }
 
+    /**
+     * Checks if the request matches the cache and can be satisfied from the cache immediately,
+     * without having to make a request to the server.
+     *
+     * This doesn't support `stale-while-revalidate`. See `evaluateRequest()` for a more complete solution.
+     *
+     * @param {HttpRequest} req - The new incoming HTTP request.
+     * @returns {boolean} `true`` if the cached response used to construct this cache policy satisfies the request without revalidation.
+     */
     satisfiesWithoutRevalidation(req) {
+        const result = this.evaluateRequest(req);
+        return !result.revalidation;
+    }
+
+    /**
+     * @param {{headers: Record<string, string>, synchronous: boolean}|undefined} revalidation - Revalidation information, if any.
+     * @returns {{response: {headers: Record<string, string>}, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object with a cached response headers and revalidation info.
+     */
+    _evaluateRequestHitResult(revalidation) {
+        return {
+            response: {
+                headers: this.responseHeaders(),
+            },
+            revalidation,
+        };
+    }
+
+    /**
+     * @param {HttpRequest} request - new incoming
+     * @param {boolean} synchronous - whether revalidation must be synchronous (not s-w-r).
+     * @returns {{headers: Record<string, string>, synchronous: boolean}} An object with revalidation headers and a synchronous flag.
+     */
+    _evaluateRequestRevalidation(request, synchronous) {
+        return {
+            synchronous,
+            headers: this.revalidationHeaders(request),
+        };
+    }
+
+    /**
+     * @param {HttpRequest} request - new incoming
+     * @returns {{response: undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}}} An object indicating no cached response and revalidation details.
+     */
+    _evaluateRequestMissResult(request) {
+        return {
+            response: undefined,
+            revalidation: this._evaluateRequestRevalidation(request, true),
+        };
+    }
+
+    /**
+     * Checks if the given request matches this cache entry, and how the cache can be used to satisfy it. Returns an object with:
+     *
+     * ```
+     * {
+     *     // If defined, you must send a request to the server.
+     *     revalidation: {
+     *         headers: {}, // HTTP headers to use when sending the revalidation response
+     *         // If true, you MUST wait for a response from the server before using the cache
+     *         // If false, this is stale-while-revalidate. The cache is stale, but you can use it while you update it asynchronously.
+     *         synchronous: bool,
+     *     },
+     *     // If defined, you can use this cached response.
+     *     response: {
+     *         headers: {}, // Updated cached HTTP headers you must use when responding to the client
+     *     },
+     * }
+     * ```
+     * @param {HttpRequest} req - new incoming HTTP request
+     * @returns {{response: {headers: Record<string, string>}|undefined, revalidation: {headers: Record<string, string>, synchronous: boolean}|undefined}} An object containing keys:
+     *   - revalidation: { headers: Record<string, string>, synchronous: boolean } Set if you should send this to the origin server
+     *   - response: { headers: Record<string, string> } Set if you can respond to the client with these cached headers
+     */
+    evaluateRequest(req) {
         this._assertRequestHasHeaders(req);
+
+        // In all circumstances, a cache MUST NOT ignore the must-revalidate directive
+        if (this._rescc['must-revalidate']) {
+            return this._evaluateRequestMissResult(req);
+        }
+
+        if (!this._requestMatches(req, false)) {
+            return this._evaluateRequestMissResult(req);
+        }
 
         // When presented with a request, a cache MUST NOT reuse a stored response, unless:
         // the presented request does not contain the no-cache pragma (Section 5.4), nor the no-cache cache directive,
         // unless the stored response is successfully validated (Section 4.3), and
         const requestCC = parseCacheControl(req.headers['cache-control']);
+
         if (requestCC['no-cache'] || /no-cache/.test(req.headers.pragma)) {
-            return false;
+            return this._evaluateRequestMissResult(req);
         }
 
-        if (requestCC['max-age'] && this.age() > requestCC['max-age']) {
-            return false;
+        if (requestCC['max-age'] && this.age() > toNumberOrZero(requestCC['max-age'])) {
+            return this._evaluateRequestMissResult(req);
         }
 
-        if (
-            requestCC['min-fresh'] &&
-            this.timeToLive() < 1000 * requestCC['min-fresh']
-        ) {
-            return false;
+        if (requestCC['min-fresh'] && this.maxAge() - this.age() < toNumberOrZero(requestCC['min-fresh'])) {
+            return this._evaluateRequestMissResult(req);
         }
 
         // the stored response is either:
         // fresh, or allowed to be served stale
         if (this.stale()) {
-            const allowsStale =
-                requestCC['max-stale'] &&
-                !this._rescc['must-revalidate'] &&
-                (true === requestCC['max-stale'] ||
-                    requestCC['max-stale'] > this.age() - this.maxAge());
-            if (!allowsStale) {
-                return false;
+            // If a value is present, then the client is willing to accept a response that has
+            // exceeded its freshness lifetime by no more than the specified number of seconds
+            const allowsStaleWithoutRevalidation = 'max-stale' in requestCC &&
+                (true === requestCC['max-stale'] || requestCC['max-stale'] > this.age() - this.maxAge());
+
+            if (allowsStaleWithoutRevalidation) {
+                return this._evaluateRequestHitResult(undefined);
             }
+
+            if (this.useStaleWhileRevalidate()) {
+                return this._evaluateRequestHitResult(this._evaluateRequestRevalidation(req, false));
+            }
+
+            return this._evaluateRequestMissResult(req);
         }
 
-        return this._requestMatches(req, false);
+        return this._evaluateRequestHitResult(undefined);
     }
 
+    /**
+     * @param {HttpRequest} req - check if this is for the same cache entry
+     * @param {boolean} allowHeadMethod - allow a HEAD method to match.
+     * @returns {boolean} `true` if the request matches.
+     */
     _requestMatches(req, allowHeadMethod) {
         // The presented effective request URI and that of the stored response match, and
-        return (
+        return !!(
             (!this._url || this._url === req.url) &&
             this._host === req.headers.host &&
             // the request method associated with the stored response allows it to be used for the presented request, and
@@ -2875,15 +3193,24 @@ module.exports = class CachePolicy {
         );
     }
 
+    /**
+     * Determines whether storing authenticated responses is allowed.
+     * @returns {boolean} `true` if allowed.
+     */
     _allowsStoringAuthenticated() {
-        //  following Cache-Control response directives (Section 5.2.2) have such an effect: must-revalidate, public, and s-maxage.
-        return (
+        // following Cache-Control response directives (Section 5.2.2) have such an effect: must-revalidate, public, and s-maxage.
+        return !!(
             this._rescc['must-revalidate'] ||
             this._rescc.public ||
             this._rescc['s-maxage']
         );
     }
 
+    /**
+     * Checks whether the Vary header in the response matches the new request.
+     * @param {HttpRequest} req - incoming HTTP request
+     * @returns {boolean} `true` if the vary headers match.
+     */
     _varyMatches(req) {
         if (!this._resHeaders.vary) {
             return true;
@@ -2904,7 +3231,13 @@ module.exports = class CachePolicy {
         return true;
     }
 
+    /**
+     * Creates a copy of the given headers without any hop-by-hop headers.
+     * @param {Record<string, string>} inHeaders - old headers from the cached response
+     * @returns {Record<string, string>} A new headers object without hop-by-hop headers.
+     */
     _copyWithoutHopByHopHeaders(inHeaders) {
+        /** @type {Record<string, string>} */
         const headers = {};
         for (const name in inHeaders) {
             if (hopByHopHeaders[name]) continue;
@@ -2930,6 +3263,11 @@ module.exports = class CachePolicy {
         return headers;
     }
 
+    /**
+     * Returns the response headers adjusted for serving the cached response.
+     * Removes hop-by-hop headers and updates the Age and Date headers.
+     * @returns {Record<string, string>} The adjusted response headers.
+     */
     responseHeaders() {
         const headers = this._copyWithoutHopByHopHeaders(this._resHeaders);
         const age = this.age();
@@ -2951,8 +3289,8 @@ module.exports = class CachePolicy {
     }
 
     /**
-     * Value of the Date response header or current time if Date was invalid
-     * @return timestamp
+     * Returns the Date header value from the response or the current time if invalid.
+     * @returns {number} Timestamp (in milliseconds) representing the Date header or response time.
      */
     date() {
         const serverDate = Date.parse(this._resHeaders.date);
@@ -2965,8 +3303,7 @@ module.exports = class CachePolicy {
     /**
      * Value of the Age header, in seconds, updated for the current time.
      * May be fractional.
-     *
-     * @return Number
+     * @returns {number} The age in seconds.
      */
     age() {
         let age = this._ageValue();
@@ -2975,16 +3312,21 @@ module.exports = class CachePolicy {
         return age + residentTime;
     }
 
+    /**
+     * @returns {number} The Age header value as a number.
+     */
     _ageValue() {
         return toNumberOrZero(this._resHeaders.age);
     }
 
     /**
-     * Value of applicable max-age (or heuristic equivalent) in seconds. This counts since response's `Date`.
+     * Possibly outdated value of applicable max-age (or heuristic equivalent) in seconds.
+     * This counts since response's `Date`.
      *
      * For an up-to-date value, see `timeToLive()`.
      *
-     * @return Number
+     * Returns the maximum age (freshness lifetime) of the response in seconds.
+     * @returns {number} The max-age value in seconds.
      */
     maxAge() {
         if (!this.storable() || this._rescc['no-cache']) {
@@ -3046,29 +3388,57 @@ module.exports = class CachePolicy {
         return defaultMinTtl;
     }
 
+    /**
+     * Remaining time this cache entry may be useful for, in *milliseconds*.
+     * You can use this as an expiration time for your cache storage.
+     *
+     * Prefer this method over `maxAge()`, because it includes other factors like `age` and `stale-while-revalidate`.
+     * @returns {number} Time-to-live in milliseconds.
+     */
     timeToLive() {
         const age = this.maxAge() - this.age();
         const staleIfErrorAge = age + toNumberOrZero(this._rescc['stale-if-error']);
         const staleWhileRevalidateAge = age + toNumberOrZero(this._rescc['stale-while-revalidate']);
-        return Math.max(0, age, staleIfErrorAge, staleWhileRevalidateAge) * 1000;
+        return Math.round(Math.max(0, age, staleIfErrorAge, staleWhileRevalidateAge) * 1000);
     }
 
+    /**
+     * If true, this cache entry is past its expiration date.
+     * Note that stale cache may be useful sometimes, see `evaluateRequest()`.
+     * @returns {boolean} `false` doesn't mean it's fresh nor usable
+     */
     stale() {
         return this.maxAge() <= this.age();
     }
 
+    /**
+     * @returns {boolean} `true` if `stale-if-error` condition allows use of a stale response.
+     */
     _useStaleIfError() {
         return this.maxAge() + toNumberOrZero(this._rescc['stale-if-error']) > this.age();
     }
 
+    /** See `evaluateRequest()` for a more complete solution
+     * @returns {boolean} `true` if `stale-while-revalidate` is currently allowed.
+     */
     useStaleWhileRevalidate() {
-        return this.maxAge() + toNumberOrZero(this._rescc['stale-while-revalidate']) > this.age();
+        const swr = toNumberOrZero(this._rescc['stale-while-revalidate']);
+        return swr > 0 && this.maxAge() + swr > this.age();
     }
 
+    /**
+     * Creates a `CachePolicy` instance from a serialized object.
+     * @param {Object} obj - The serialized object.
+     * @returns {CachePolicy} A new CachePolicy instance.
+     */
     static fromObject(obj) {
         return new this(undefined, undefined, { _fromObject: obj });
     }
 
+    /**
+     * @param {any} obj - The serialized object.
+     * @throws {Error} If already initialized or if the object is invalid.
+     */
     _fromObject(obj) {
         if (this._responseTime) throw Error('Reinitialized');
         if (!obj || obj.v !== 1) throw Error('Invalid serialization');
@@ -3078,6 +3448,7 @@ module.exports = class CachePolicy {
         this._cacheHeuristic = obj.ch;
         this._immutableMinTtl =
             obj.imm !== undefined ? obj.imm : 24 * 3600 * 1000;
+        this._ignoreCargoCult = !!obj.icc;
         this._status = obj.st;
         this._resHeaders = obj.resh;
         this._rescc = obj.rescc;
@@ -3089,6 +3460,10 @@ module.exports = class CachePolicy {
         this._reqcc = obj.reqcc;
     }
 
+    /**
+     * Serializes the `CachePolicy` instance into a JSON-serializable object.
+     * @returns {Object} The serialized object.
+     */
     toObject() {
         return {
             v: 1,
@@ -3096,6 +3471,7 @@ module.exports = class CachePolicy {
             sh: this._isShared,
             ch: this._cacheHeuristic,
             imm: this._immutableMinTtl,
+            icc: this._ignoreCargoCult,
             st: this._status,
             resh: this._resHeaders,
             rescc: this._rescc,
@@ -3114,6 +3490,8 @@ module.exports = class CachePolicy {
      *
      * Hop by hop headers are always stripped.
      * Revalidation headers may be added or removed, depending on request.
+     * @param {HttpRequest} incomingReq - The incoming HTTP request.
+     * @returns {Record<string, string>} The headers for the revalidation request.
      */
     revalidationHeaders(incomingReq) {
         this._assertRequestHasHeaders(incomingReq);
@@ -3178,17 +3556,22 @@ module.exports = class CachePolicy {
      * Returns {policy, modified} where modified is a boolean indicating
      * whether the response body has been modified, and old cached body can't be used.
      *
-     * @return {Object} {policy: CachePolicy, modified: Boolean}
+     * @param {HttpRequest} request - The latest HTTP request asking for the cached entry.
+     * @param {HttpResponse} response - The latest revalidation HTTP response from the origin server.
+     * @returns {{policy: CachePolicy, modified: boolean, matches: boolean}} The updated policy and modification status.
+     * @throws {Error} If the response headers are missing.
      */
     revalidatedPolicy(request, response) {
         this._assertRequestHasHeaders(request);
-        if(this._useStaleIfError() && isErrorResponse(response)) {  // I consider the revalidation request unsuccessful
+
+        if (this._useStaleIfError() && isErrorResponse(response)) {
           return {
-            modified: false,
-            matches: false,
-            policy: this,
+              policy: this,
+              modified: false,
+              matches: true,
           };
         }
+
         if (!response || !response.headers) {
             throw Error('Response headers missing');
         }
@@ -3235,9 +3618,16 @@ module.exports = class CachePolicy {
             }
         }
 
+        const optionsCopy = {
+            shared: this._isShared,
+            cacheHeuristic: this._cacheHeuristic,
+            immutableMinTimeToLive: this._immutableMinTtl,
+            ignoreCargoCult: this._ignoreCargoCult,
+        };
+
         if (!matches) {
             return {
-                policy: new this.constructor(request, response),
+                policy: new this.constructor(request, response, optionsCopy),
                 // Client receiving 304 without body, even if it's invalid/mismatched has no option
                 // but to reuse a cached body. We don't have a good way to tell clients to do
                 // error recovery in such case.
@@ -3262,11 +3652,7 @@ module.exports = class CachePolicy {
             headers,
         });
         return {
-            policy: new this.constructor(request, newResponse, {
-                shared: this._isShared,
-                cacheHeuristic: this._cacheHeuristic,
-                immutableMinTimeToLive: this._immutableMinTtl,
-            }),
+            policy: new this.constructor(request, newResponse, optionsCopy),
             modified: false,
             matches: true,
         };
@@ -3276,19 +3662,19 @@ module.exports = class CachePolicy {
 
 /***/ }),
 
-/***/ 3251:
+/***/ 685:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 // See https://github.com/facebook/jest/issues/2549
 // eslint-disable-next-line node/prefer-global/url
-const {URL} = __webpack_require__(57310);
-const EventEmitter = __webpack_require__(82361);
-const tls = __webpack_require__(24404);
-const http2 = __webpack_require__(85158);
-const QuickLRU = __webpack_require__(66180);
-const delayAsyncDestroy = __webpack_require__(21208);
+const {URL} = __webpack_require__(7016);
+const EventEmitter = __webpack_require__(4434);
+const tls = __webpack_require__(4756);
+const http2 = __webpack_require__(5675);
+const QuickLRU = __webpack_require__(5475);
+const delayAsyncDestroy = __webpack_require__(811);
 
 const kCurrentStreamCount = Symbol('currentStreamCount');
 const kRequest = Symbol('request');
@@ -4080,22 +4466,22 @@ module.exports = {
 
 /***/ }),
 
-/***/ 7272:
+/***/ 9213:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 // See https://github.com/facebook/jest/issues/2549
 // eslint-disable-next-line node/prefer-global/url
-const {URL, urlToHttpOptions} = __webpack_require__(57310);
-const http = __webpack_require__(13685);
-const https = __webpack_require__(95687);
-const resolveALPN = __webpack_require__(57564);
-const QuickLRU = __webpack_require__(66180);
-const {Agent, globalAgent} = __webpack_require__(3251);
-const Http2ClientRequest = __webpack_require__(38201);
-const calculateServerName = __webpack_require__(40185);
-const delayAsyncDestroy = __webpack_require__(21208);
+const {URL, urlToHttpOptions} = __webpack_require__(7016);
+const http = __webpack_require__(8611);
+const https = __webpack_require__(5692);
+const resolveALPN = __webpack_require__(8824);
+const QuickLRU = __webpack_require__(5475);
+const {Agent, globalAgent} = __webpack_require__(685);
+const Http2ClientRequest = __webpack_require__(7605);
+const calculateServerName = __webpack_require__(2850);
+const delayAsyncDestroy = __webpack_require__(811);
 
 const cache = new QuickLRU({maxSize: 100});
 const queue = new Map();
@@ -4284,6 +4670,25 @@ module.exports = async (input, options, callback) => {
 		options.agent = agent.http;
 	}
 
+	// If we're sending HTTP/1.1, handle any explicitly set H2 headers in the options:
+	if (options.headers) {
+		options.headers = {...options.headers};
+
+		// :authority is equivalent to the HTTP/1.1 host header
+		if (options.headers[':authority']) {
+			if (!options.headers.host) {
+				options.headers.host = options.headers[':authority'];
+			}
+
+			delete options.headers[':authority'];
+		}
+
+		// Remove other HTTP/2 headers as they have their counterparts in the options
+		delete options.headers[':method'];
+		delete options.headers[':scheme'];
+		delete options.headers[':path'];
+	}
+
 	return delayAsyncDestroy(http.request(options, callback));
 };
 
@@ -4294,27 +4699,27 @@ module.exports.createResolveProtocol = createResolveProtocol;
 
 /***/ }),
 
-/***/ 38201:
+/***/ 7605:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 // See https://github.com/facebook/jest/issues/2549
 // eslint-disable-next-line node/prefer-global/url
-const {URL, urlToHttpOptions} = __webpack_require__(57310);
-const http2 = __webpack_require__(85158);
-const {Writable} = __webpack_require__(12781);
-const {Agent, globalAgent} = __webpack_require__(3251);
-const IncomingMessage = __webpack_require__(61404);
-const proxyEvents = __webpack_require__(57691);
+const {URL, urlToHttpOptions} = __webpack_require__(7016);
+const http2 = __webpack_require__(5675);
+const {Writable} = __webpack_require__(2203);
+const {Agent, globalAgent} = __webpack_require__(685);
+const IncomingMessage = __webpack_require__(2156);
+const proxyEvents = __webpack_require__(118);
 const {
 	ERR_INVALID_ARG_TYPE,
 	ERR_INVALID_PROTOCOL,
 	ERR_HTTP_HEADERS_SENT
-} = __webpack_require__(33556);
-const validateHeaderName = __webpack_require__(15648);
-const validateHeaderValue = __webpack_require__(59937);
-const proxySocketHandler = __webpack_require__(33507);
+} = __webpack_require__(9731);
+const validateHeaderName = __webpack_require__(1212);
+const validateHeaderValue = __webpack_require__(6462);
+const proxySocketHandler = __webpack_require__(7083);
 
 const {
 	HTTP2_HEADER_STATUS,
@@ -4865,12 +5270,12 @@ module.exports = ClientRequest;
 
 /***/ }),
 
-/***/ 61404:
+/***/ 2156:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {Readable} = __webpack_require__(12781);
+const {Readable} = __webpack_require__(2203);
 
 class IncomingMessage extends Readable {
 	constructor(socket, highWaterMark) {
@@ -4946,30 +5351,30 @@ module.exports = IncomingMessage;
 
 /***/ }),
 
-/***/ 59759:
+/***/ 4956:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const http2 = __webpack_require__(85158);
+const http2 = __webpack_require__(5675);
 const {
 	Agent,
 	globalAgent
-} = __webpack_require__(3251);
-const ClientRequest = __webpack_require__(38201);
-const IncomingMessage = __webpack_require__(61404);
-const auto = __webpack_require__(7272);
+} = __webpack_require__(685);
+const ClientRequest = __webpack_require__(7605);
+const IncomingMessage = __webpack_require__(2156);
+const auto = __webpack_require__(9213);
 const {
 	HttpOverHttp2,
 	HttpsOverHttp2
-} = __webpack_require__(65313);
-const Http2OverHttp2 = __webpack_require__(11692);
+} = __webpack_require__(9126);
+const Http2OverHttp2 = __webpack_require__(3747);
 const {
 	Http2OverHttp,
 	Http2OverHttps
-} = __webpack_require__(12758);
-const validateHeaderName = __webpack_require__(15648);
-const validateHeaderValue = __webpack_require__(59937);
+} = __webpack_require__(278);
+const validateHeaderName = __webpack_require__(1212);
+const validateHeaderValue = __webpack_require__(6462);
 
 const request = (url, options, callback) => new ClientRequest(url, options, callback);
 
@@ -5004,7 +5409,7 @@ module.exports = {
 
 /***/ }),
 
-/***/ 41078:
+/***/ 2037:
 /***/ ((module) => {
 
 "use strict";
@@ -5029,19 +5434,19 @@ module.exports = self => {
 
 /***/ }),
 
-/***/ 65313:
+/***/ 9126:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const tls = __webpack_require__(24404);
-const http = __webpack_require__(13685);
-const https = __webpack_require__(95687);
-const JSStreamSocket = __webpack_require__(15310);
-const {globalAgent} = __webpack_require__(3251);
-const UnexpectedStatusCodeError = __webpack_require__(10510);
-const initialize = __webpack_require__(41844);
-const getAuthorizationHeaders = __webpack_require__(41078);
+const tls = __webpack_require__(4756);
+const http = __webpack_require__(8611);
+const https = __webpack_require__(5692);
+const JSStreamSocket = __webpack_require__(5056);
+const {globalAgent} = __webpack_require__(685);
+const UnexpectedStatusCodeError = __webpack_require__(5930);
+const initialize = __webpack_require__(4833);
+const getAuthorizationHeaders = __webpack_require__(2037);
 
 const createConnection = (self, options, callback) => {
 	(async () => {
@@ -5127,15 +5532,15 @@ module.exports = {
 
 /***/ }),
 
-/***/ 12758:
+/***/ 278:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const http = __webpack_require__(13685);
-const https = __webpack_require__(95687);
-const Http2OverHttpX = __webpack_require__(45295);
-const getAuthorizationHeaders = __webpack_require__(41078);
+const http = __webpack_require__(8611);
+const https = __webpack_require__(5692);
+const Http2OverHttpX = __webpack_require__(861);
+const getAuthorizationHeaders = __webpack_require__(2037);
 
 const getStream = request => new Promise((resolve, reject) => {
 	const onConnect = (response, socket, head) => {
@@ -5183,14 +5588,14 @@ module.exports = {
 
 /***/ }),
 
-/***/ 11692:
+/***/ 3747:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {globalAgent} = __webpack_require__(3251);
-const Http2OverHttpX = __webpack_require__(45295);
-const getAuthorizationHeaders = __webpack_require__(41078);
+const {globalAgent} = __webpack_require__(685);
+const Http2OverHttpX = __webpack_require__(861);
+const getAuthorizationHeaders = __webpack_require__(2037);
 
 const getStatusCode = stream => new Promise((resolve, reject) => {
 	stream.once('error', reject);
@@ -5223,15 +5628,15 @@ module.exports = Http2OverHttp2;
 
 /***/ }),
 
-/***/ 45295:
+/***/ 861:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {Agent} = __webpack_require__(3251);
-const JSStreamSocket = __webpack_require__(15310);
-const UnexpectedStatusCodeError = __webpack_require__(10510);
-const initialize = __webpack_require__(41844);
+const {Agent} = __webpack_require__(685);
+const JSStreamSocket = __webpack_require__(5056);
+const UnexpectedStatusCodeError = __webpack_require__(5930);
+const initialize = __webpack_require__(4833);
 
 class Http2OverHttpX extends Agent {
 	constructor(options) {
@@ -5271,15 +5676,15 @@ module.exports = Http2OverHttpX;
 
 /***/ }),
 
-/***/ 41844:
+/***/ 4833:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 // See https://github.com/facebook/jest/issues/2549
 // eslint-disable-next-line node/prefer-global/url
-const {URL} = __webpack_require__(57310);
-const checkType = __webpack_require__(34424);
+const {URL} = __webpack_require__(7016);
+const checkType = __webpack_require__(891);
 
 module.exports = (self, proxyOptions) => {
 	checkType('proxyOptions', proxyOptions, ['object']);
@@ -5300,7 +5705,7 @@ module.exports = (self, proxyOptions) => {
 
 /***/ }),
 
-/***/ 10510:
+/***/ 5930:
 /***/ ((module) => {
 
 "use strict";
@@ -5319,13 +5724,13 @@ module.exports = UnexpectedStatusCodeError;
 
 /***/ }),
 
-/***/ 40185:
+/***/ 2850:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {isIP} = __webpack_require__(41808);
-const assert = __webpack_require__(39491);
+const {isIP} = __webpack_require__(9278);
+const assert = __webpack_require__(2613);
 
 const getHost = host => {
 	if (host[0] === '[') {
@@ -5356,7 +5761,7 @@ module.exports = host => {
 
 /***/ }),
 
-/***/ 34424:
+/***/ 891:
 /***/ ((module) => {
 
 "use strict";
@@ -5384,7 +5789,7 @@ module.exports = checkType;
 
 /***/ }),
 
-/***/ 21208:
+/***/ 811:
 /***/ ((module) => {
 
 "use strict";
@@ -5425,7 +5830,7 @@ module.exports = stream => {
 
 /***/ }),
 
-/***/ 33556:
+/***/ 9731:
 /***/ ((module) => {
 
 "use strict";
@@ -5484,7 +5889,7 @@ makeError(
 
 /***/ }),
 
-/***/ 65675:
+/***/ 6365:
 /***/ ((module) => {
 
 "use strict";
@@ -5505,13 +5910,13 @@ module.exports = header => {
 
 /***/ }),
 
-/***/ 15310:
+/***/ 5056:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const stream = __webpack_require__(12781);
-const tls = __webpack_require__(24404);
+const stream = __webpack_require__(2203);
+const tls = __webpack_require__(4756);
 
 // Really awesome hack.
 const JSStreamSocket = (new tls.TLSSocket(new stream.PassThrough()))._handle._parentWrap.constructor;
@@ -5521,7 +5926,7 @@ module.exports = JSStreamSocket;
 
 /***/ }),
 
-/***/ 57691:
+/***/ 118:
 /***/ ((module) => {
 
 "use strict";
@@ -5536,12 +5941,12 @@ module.exports = (from, to, events) => {
 
 /***/ }),
 
-/***/ 33507:
+/***/ 7083:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {ERR_HTTP2_NO_SOCKET_MANIPULATION} = __webpack_require__(33556);
+const {ERR_HTTP2_NO_SOCKET_MANIPULATION} = __webpack_require__(9731);
 
 /* istanbul ignore file */
 /* https://github.com/nodejs/node/blob/6eec858f34a40ffa489c1ec54bb24da72a28c781/lib/internal/http2/compat.js#L195-L272 */
@@ -5646,13 +6051,13 @@ module.exports = proxySocketHandler;
 
 /***/ }),
 
-/***/ 15648:
+/***/ 1212:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const {ERR_INVALID_HTTP_TOKEN} = __webpack_require__(33556);
-const isRequestPseudoHeader = __webpack_require__(65675);
+const {ERR_INVALID_HTTP_TOKEN} = __webpack_require__(9731);
+const isRequestPseudoHeader = __webpack_require__(6365);
 
 const isValidHttpToken = /^[\^`\-\w!#$%&*+.|~]+$/;
 
@@ -5665,7 +6070,7 @@ module.exports = name => {
 
 /***/ }),
 
-/***/ 59937:
+/***/ 6462:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
@@ -5673,7 +6078,7 @@ module.exports = name => {
 const {
 	ERR_HTTP_INVALID_HEADER_VALUE,
 	ERR_INVALID_CHAR
-} = __webpack_require__(33556);
+} = __webpack_require__(9731);
 
 const isInvalidHeaderValue = /[^\t\u0020-\u007E\u0080-\u00FF]/;
 
@@ -5690,7 +6095,7 @@ module.exports = (name, value) => {
 
 /***/ }),
 
-/***/ 42029:
+/***/ 5563:
 /***/ ((__unused_webpack_module, exports) => {
 
 //TODO: handle reviver/dehydrate function like normal
@@ -5755,14 +6160,14 @@ exports.parse = function (s) {
 
 /***/ }),
 
-/***/ 36419:
+/***/ 6018:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
 
-const EventEmitter = __webpack_require__(82361);
-const JSONB = __webpack_require__(42029);
+const EventEmitter = __webpack_require__(4434);
+const JSONB = __webpack_require__(5563);
 
 const loadStore = options => {
 	const adapters = {
@@ -5827,7 +6232,7 @@ class Keyv extends EventEmitter {
 			for await (const [key, raw] of typeof iterator === 'function'
 				? iterator(this.opts.store.namespace)
 				: iterator) {
-				const data = this.opts.deserialize(raw);
+				const data = await this.opts.deserialize(raw);
 				if (this.opts.store.namespace && !key.includes(this.opts.store.namespace)) {
 					continue;
 				}
@@ -5914,27 +6319,22 @@ class Keyv extends EventEmitter {
 				}
 
 				if (isArray) {
-					const result = [];
-
-					for (let row of data) {
+					return data.map((row, index) => {
 						if ((typeof row === 'string')) {
 							row = this.opts.deserialize(row);
 						}
 
 						if (row === undefined || row === null) {
-							result.push(undefined);
-							continue;
+							return undefined;
 						}
 
 						if (typeof row.expires === 'number' && Date.now() > row.expires) {
-							this.delete(key).then(() => undefined);
-							result.push(undefined);
-						} else {
-							result.push((options && options.raw) ? row : row.value);
+							this.delete(key[index]).then(() => undefined);
+							return undefined;
 						}
-					}
 
-					return result;
+						return (options && options.raw) ? row : row.value;
+					});
 				}
 
 				if (typeof data.expires === 'number' && Date.now() > data.expires) {
@@ -6027,7 +6427,7 @@ module.exports = Keyv;
 
 /***/ }),
 
-/***/ 66180:
+/***/ 5475:
 /***/ ((module) => {
 
 "use strict";
@@ -6158,12 +6558,12 @@ module.exports = QuickLRU;
 
 /***/ }),
 
-/***/ 57564:
+/***/ 8824:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
 
-const tls = __webpack_require__(24404);
+const tls = __webpack_require__(4756);
 
 module.exports = (options = {}, connect = tls.connect) => new Promise((resolve, reject) => {
 	let timeout = false;
@@ -6209,7 +6609,7 @@ module.exports = (options = {}, connect = tls.connect) => new Promise((resolve, 
 
 /***/ }),
 
-/***/ 74774:
+/***/ 4550:
 /***/ ((module) => {
 
 // GENERATED FILE. DO NOT EDIT.
@@ -6466,28 +6866,24 @@ else if (true) module.exports = ipCodec;
 
 /***/ }),
 
-/***/ 13340:
+/***/ 739:
 /***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
 
 "use strict";
-// ESM COMPAT FLAG
-__webpack_require__.r(__webpack_exports__);
 
 // EXPORTS
 __webpack_require__.d(__webpack_exports__, {
-  "CancelError": () => (/* reexport */ types_CancelError),
-  "IpNotFoundError": () => (/* reexport */ IpNotFoundError),
-  "publicIp": () => (/* binding */ publicIp),
-  "publicIpv4": () => (/* binding */ publicIpv4),
-  "publicIpv6": () => (/* binding */ publicIpv6)
+  publicIpv4: () => (/* binding */ publicIpv4)
 });
 
+// UNUSED EXPORTS: CancelError, IpNotFoundError, publicIp, publicIpv6
+
 // EXTERNAL MODULE: external "node:util"
-var external_node_util_ = __webpack_require__(47261);
+var external_node_util_ = __webpack_require__(7975);
 // EXTERNAL MODULE: external "node:dgram"
-var external_node_dgram_ = __webpack_require__(11215);
+var external_node_dgram_ = __webpack_require__(1314);
 // EXTERNAL MODULE: ./node_modules/dns-socket/index.js
-var dns_socket = __webpack_require__(42022);
+var dns_socket = __webpack_require__(6791);
 ;// CONCATENATED MODULE: ./node_modules/@sindresorhus/is/dist/index.js
 const typedArrayTypeNames = [
     'Int8Array',
@@ -6572,20 +6968,27 @@ function is(value) {
         return 'null';
     }
     switch (typeof value) {
-        case 'undefined':
+        case 'undefined': {
             return 'undefined';
-        case 'string':
+        }
+        case 'string': {
             return 'string';
-        case 'number':
+        }
+        case 'number': {
             return Number.isNaN(value) ? 'NaN' : 'number';
-        case 'boolean':
+        }
+        case 'boolean': {
             return 'boolean';
-        case 'function':
+        }
+        case 'function': {
             return 'Function';
-        case 'bigint':
+        }
+        case 'bigint': {
             return 'bigint';
-        case 'symbol':
+        }
+        case 'symbol': {
             return 'symbol';
+        }
         default:
     }
     if (is.observable(value)) {
@@ -6610,6 +7013,8 @@ is.undefined = isOfType('undefined');
 is.string = isOfType('string');
 const isNumberType = isOfType('number');
 is.number = (value) => isNumberType(value) && !is.nan(value);
+is.positiveNumber = (value) => is.number(value) && value > 0;
+is.negativeNumber = (value) => is.number(value) && value < 0;
 is.bigint = isOfType('bigint');
 // eslint-disable-next-line @typescript-eslint/ban-types
 is.function_ = isOfType('function');
@@ -6626,6 +7031,7 @@ is.array = (value, assertion) => {
     if (!is.function_(assertion)) {
         return true;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return value.every(element => assertion(element));
 };
 // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
@@ -6668,6 +7074,7 @@ is.bigUint64Array = isObjectOfType('BigUint64Array');
 is.arrayBuffer = isObjectOfType('ArrayBuffer');
 is.sharedArrayBuffer = isObjectOfType('SharedArrayBuffer');
 is.dataView = isObjectOfType('DataView');
+// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 is.enumCase = (value, targetEnum) => Object.values(targetEnum).includes(value);
 is.directInstanceOf = (instance, class_) => Object.getPrototypeOf(instance) === class_.prototype;
 is.urlInstance = (value) => isObjectOfType('URL')(value);
@@ -6703,6 +7110,12 @@ is.plainObject = (value) => {
 is.typedArray = (value) => isTypedArrayName(getObjectType(value));
 const isValidLength = (value) => is.safeInteger(value) && value >= 0;
 is.arrayLike = (value) => !is.nullOrUndefined(value) && !is.function_(value) && isValidLength(value.length);
+is.tupleLike = (value, guards) => {
+    if (is.array(guards) && is.array(value) && guards.length === value.length) {
+        return guards.every((guard, index) => guard(value[index]));
+    }
+    return false;
+};
 is.inRange = (value, range) => {
     if (is.number(range)) {
         return value >= Math.min(0, range) && value <= Math.max(range, 0);
@@ -6802,6 +7215,8 @@ const assert = {
     undefined: (value) => assertType(is.undefined(value), 'undefined', value),
     string: (value) => assertType(is.string(value), 'string', value),
     number: (value) => assertType(is.number(value), 'number', value),
+    positiveNumber: (value) => assertType(is.positiveNumber(value), "positive number" /* AssertionTypeDescription.positiveNumber */, value),
+    negativeNumber: (value) => assertType(is.negativeNumber(value), "negative number" /* AssertionTypeDescription.negativeNumber */, value),
     bigint: (value) => assertType(is.bigint(value), 'bigint', value),
     // eslint-disable-next-line @typescript-eslint/ban-types
     function_: (value) => assertType(is.function_(value), 'Function', value),
@@ -6868,6 +7283,7 @@ const assert = {
     plainObject: (value) => assertType(is.plainObject(value), "plain object" /* AssertionTypeDescription.plainObject */, value),
     typedArray: (value) => assertType(is.typedArray(value), "TypedArray" /* AssertionTypeDescription.typedArray */, value),
     arrayLike: (value) => assertType(is.arrayLike(value), "array-like" /* AssertionTypeDescription.arrayLike */, value),
+    tupleLike: (value, guards) => assertType(is.tupleLike(value, guards), "tuple-like" /* AssertionTypeDescription.tupleLike */, value),
     domElement: (value) => assertType(is.domElement(value), "HTMLElement" /* AssertionTypeDescription.domElement */, value),
     observable: (value) => assertType(is.observable(value), 'Observable', value),
     nodeStream: (value) => assertType(is.nodeStream(value), "Node.js Stream" /* AssertionTypeDescription.nodeStream */, value),
@@ -6925,7 +7341,7 @@ Object.defineProperties(assert, {
 /* harmony default export */ const dist = (is);
 
 // EXTERNAL MODULE: external "node:events"
-var external_node_events_ = __webpack_require__(15673);
+var external_node_events_ = __webpack_require__(8474);
 ;// CONCATENATED MODULE: ./node_modules/p-cancelable/index.js
 class CancelError extends Error {
 	constructor(reason) {
@@ -7219,21 +7635,19 @@ class AbortError extends RequestError {
 }
 
 // EXTERNAL MODULE: external "node:process"
-var external_node_process_ = __webpack_require__(97742);
+var external_node_process_ = __webpack_require__(1708);
 // EXTERNAL MODULE: external "node:buffer"
-var external_node_buffer_ = __webpack_require__(72254);
+var external_node_buffer_ = __webpack_require__(4573);
 // EXTERNAL MODULE: external "node:stream"
-var external_node_stream_ = __webpack_require__(84492);
-// EXTERNAL MODULE: external "node:url"
-var external_node_url_ = __webpack_require__(41041);
+var external_node_stream_ = __webpack_require__(7075);
 // EXTERNAL MODULE: external "node:http"
-var external_node_http_ = __webpack_require__(88849);
+var external_node_http_ = __webpack_require__(7067);
 // EXTERNAL MODULE: external "events"
-var external_events_ = __webpack_require__(82361);
+var external_events_ = __webpack_require__(4434);
 // EXTERNAL MODULE: external "util"
-var external_util_ = __webpack_require__(73837);
+var external_util_ = __webpack_require__(9023);
 // EXTERNAL MODULE: ./node_modules/defer-to-connect/dist/source/index.js
-var source = __webpack_require__(50969);
+var source = __webpack_require__(2114);
 ;// CONCATENATED MODULE: ./node_modules/@szmarczak/http-timer/dist/source/index.js
 
 
@@ -7342,8 +7756,10 @@ const timer = (request) => {
 };
 /* harmony default export */ const dist_source = (timer);
 
+// EXTERNAL MODULE: external "node:url"
+var external_node_url_ = __webpack_require__(3136);
 // EXTERNAL MODULE: external "node:crypto"
-var external_node_crypto_ = __webpack_require__(6005);
+var external_node_crypto_ = __webpack_require__(7598);
 ;// CONCATENATED MODULE: ./node_modules/normalize-url/index.js
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URIs
 const DATA_URL_DEFAULT_MIME_TYPE = 'text/plain';
@@ -7360,7 +7776,10 @@ const supportedProtocols = new Set([
 const hasCustomProtocol = urlString => {
 	try {
 		const {protocol} = new URL(urlString);
-		return protocol.endsWith(':') && !supportedProtocols.has(protocol);
+
+		return protocol.endsWith(':')
+			&& !protocol.includes('.')
+			&& !supportedProtocols.has(protocol);
 	} catch {
 		return false;
 	}
@@ -7525,7 +7944,7 @@ function normalizeUrl(urlString, options) {
 	// Decode URI octets
 	if (urlObject.pathname) {
 		try {
-			urlObject.pathname = decodeURI(urlObject.pathname);
+			urlObject.pathname = decodeURI(urlObject.pathname).replace(/\\/g, '%5C');
 		} catch {}
 	}
 
@@ -7629,9 +8048,9 @@ function normalizeUrl(urlString, options) {
 }
 
 // EXTERNAL MODULE: ./node_modules/get-stream/index.js
-var get_stream = __webpack_require__(61641);
+var get_stream = __webpack_require__(6771);
 // EXTERNAL MODULE: ./node_modules/http-cache-semantics/index.js
-var http_cache_semantics = __webpack_require__(11918);
+var http_cache_semantics = __webpack_require__(4584);
 ;// CONCATENATED MODULE: ./node_modules/lowercase-keys/index.js
 function lowercaseKeys(object) {
 	return Object.fromEntries(Object.entries(object).map(([key, value]) => [key.toLowerCase(), value]));
@@ -7679,7 +8098,7 @@ class Response extends external_node_stream_.Readable {
 }
 
 // EXTERNAL MODULE: ./node_modules/keyv/src/index.js
-var src = __webpack_require__(36419);
+var src = __webpack_require__(6018);
 ;// CONCATENATED MODULE: ./node_modules/mimic-response/index.js
 // We define these manually to ensure they're always copied
 // even if they would move up the prototype chain
@@ -7941,7 +8360,7 @@ class CacheableRequest {
                 const get = async (options_) => {
                     await Promise.resolve();
                     const cacheEntry = options_.cache ? await this.cache.get(key) : undefined;
-                    if (typeof cacheEntry === 'undefined' && !options_.forceRefresh) {
+                    if (cacheEntry === undefined && !options_.forceRefresh) {
                         makeRequest(options_);
                         return;
                     }
@@ -8054,7 +8473,7 @@ const convertHeaders = (headers) => {
 const onResponse = 'onResponse';
 //# sourceMappingURL=index.js.map
 // EXTERNAL MODULE: ./node_modules/decompress-response/index.js
-var decompress_response = __webpack_require__(25578);
+var decompress_response = __webpack_require__(1373);
 ;// CONCATENATED MODULE: ./node_modules/form-data-encoder/lib/util/isFunction.js
 const isFunction = (value) => (typeof value === "function");
 
@@ -8342,7 +8761,7 @@ function proxyEvents(from, to, events) {
 }
 
 // EXTERNAL MODULE: external "node:net"
-var external_node_net_ = __webpack_require__(87503);
+var external_node_net_ = __webpack_require__(7030);
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/utils/unhandle.js
 // When attaching listeners, it's very easy to forget about them.
 // Especially if you do error handling and set timeouts.
@@ -8423,13 +8842,13 @@ function timedOut(request, delays, options) {
             throw error;
         }
     });
-    if (typeof delays.request !== 'undefined') {
+    if (delays.request !== undefined) {
         const cancelTimeout = addTimeout(delays.request, timeoutHandler, 'request');
         once(request, 'response', (response) => {
             once(response, 'end', cancelTimeout);
         });
     }
-    if (typeof delays.socket !== 'undefined') {
+    if (delays.socket !== undefined) {
         const { socket } = delays;
         const socketTimeoutHandler = () => {
             timeoutHandler(socket, 'socket');
@@ -8442,17 +8861,17 @@ function timedOut(request, delays, options) {
             request.removeListener('timeout', socketTimeoutHandler);
         });
     }
-    const hasLookup = typeof delays.lookup !== 'undefined';
-    const hasConnect = typeof delays.connect !== 'undefined';
-    const hasSecureConnect = typeof delays.secureConnect !== 'undefined';
-    const hasSend = typeof delays.send !== 'undefined';
+    const hasLookup = delays.lookup !== undefined;
+    const hasConnect = delays.connect !== undefined;
+    const hasSecureConnect = delays.secureConnect !== undefined;
+    const hasSend = delays.send !== undefined;
     if (hasLookup || hasConnect || hasSecureConnect || hasSend) {
         once(request, 'socket', (socket) => {
             const { socketPath } = request;
             /* istanbul ignore next: hard to test */
             if (socket.connecting) {
                 const hasPath = Boolean(socketPath ?? external_node_net_.isIP(hostname ?? host ?? '') !== 0);
-                if (hasLookup && !hasPath && typeof socket.address().address === 'undefined') {
+                if (hasLookup && !hasPath && socket.address().address === undefined) {
                     const cancelTimeout = addTimeout(delays.lookup, timeoutHandler, 'lookup');
                     once(socket, 'lookup', cancelTimeout);
                 }
@@ -8490,13 +8909,13 @@ function timedOut(request, delays, options) {
             }
         });
     }
-    if (typeof delays.response !== 'undefined') {
+    if (delays.response !== undefined) {
         once(request, 'upload-complete', () => {
             const cancelTimeout = addTimeout(delays.response, timeoutHandler, 'response');
             once(request, 'response', cancelTimeout);
         });
     }
-    if (typeof delays.read !== 'undefined') {
+    if (delays.read !== undefined) {
         once(request, 'response', (response) => {
             const cancelTimeout = addTimeout(delays.read, timeoutHandler, 'read');
             once(response, 'end', cancelTimeout);
@@ -8601,13 +9020,13 @@ const calculateRetryDelay = ({ attemptCount, retryOptions, error, retryAfter, co
 /* harmony default export */ const calculate_retry_delay = (calculateRetryDelay);
 
 // EXTERNAL MODULE: external "node:tls"
-var external_node_tls_ = __webpack_require__(31764);
+var external_node_tls_ = __webpack_require__(1692);
 // EXTERNAL MODULE: external "node:https"
-var external_node_https_ = __webpack_require__(22286);
+var external_node_https_ = __webpack_require__(4708);
 // EXTERNAL MODULE: external "node:dns"
-var external_node_dns_ = __webpack_require__(30604);
+var external_node_dns_ = __webpack_require__(610);
 // EXTERNAL MODULE: external "node:os"
-var external_node_os_ = __webpack_require__(70612);
+var external_node_os_ = __webpack_require__(8161);
 ;// CONCATENATED MODULE: ./node_modules/cacheable-lookup/source/index.js
 
 
@@ -9057,7 +9476,7 @@ class CacheableLookup {
 }
 
 // EXTERNAL MODULE: ./node_modules/http2-wrapper/source/index.js
-var http2_wrapper_source = __webpack_require__(59759);
+var http2_wrapper_source = __webpack_require__(4956);
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/parse-link-header.js
 function parseLinkHeader(link) {
     const parsed = [];
@@ -9094,7 +9513,6 @@ function parseLinkHeader(link) {
 }
 
 ;// CONCATENATED MODULE: ./node_modules/got/dist/source/core/options.js
-
 
 
 
@@ -9262,7 +9680,7 @@ const defaultInternals = {
             const next = parsed.find(entry => entry.parameters.rel === 'next' || entry.parameters.rel === '"next"');
             if (next) {
                 return {
-                    url: new external_node_url_.URL(next.reference, response.url),
+                    url: new URL(next.reference, response.url),
                 };
             }
             return false;
@@ -9277,7 +9695,7 @@ const defaultInternals = {
     setHost: true,
     maxHeaderSize: undefined,
     signal: undefined,
-    enableUnixSockets: true,
+    enableUnixSockets: false,
 };
 const cloneInternals = (internals) => {
     const { hooks, retry } = internals;
@@ -9303,7 +9721,7 @@ const cloneInternals = (internals) => {
             beforeRetry: [...hooks.beforeRetry],
             afterResponse: [...hooks.afterResponse],
         },
-        searchParams: internals.searchParams ? new external_node_url_.URLSearchParams(internals.searchParams) : undefined,
+        searchParams: internals.searchParams ? new URLSearchParams(internals.searchParams) : undefined,
         pagination: { ...internals.pagination },
     };
     if (result.url !== undefined) {
@@ -9504,7 +9922,12 @@ class Options {
                     throw new Error(`Unexpected option: ${key}`);
                 }
                 // @ts-expect-error Type 'unknown' is not assignable to type 'never'.
-                this[key] = options[key];
+                const value = options[key];
+                if (value === undefined) {
+                    continue;
+                }
+                // @ts-expect-error Type 'unknown' is not assignable to type 'never'.
+                this[key] = value;
                 push = true;
             }
             if (push) {
@@ -9785,9 +10208,8 @@ class Options {
             throw new Error('`url` must not start with a slash');
         }
         const urlString = `${this.prefixUrl}${value.toString()}`;
-        const url = new external_node_url_.URL(urlString);
+        const url = new URL(urlString);
         this._internals.url = url;
-        decodeURI(urlString);
         if (url.protocol === 'unix:') {
             url.href = `http://unix${url.pathname}${url.search}`;
         }
@@ -9861,8 +10283,6 @@ class Options {
     /**
     You can abort the `request` using [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController).
 
-    *Requires Node.js 16 or later.*
-
     @example
     ```
     import got from 'got';
@@ -9878,11 +10298,9 @@ class Options {
     }, 100);
     ```
     */
-    // TODO: Replace `any` with `AbortSignal` when targeting Node 16.
     get signal() {
         return this._internals.signal;
     }
-    // TODO: Replace `any` with `AbortSignal` when targeting Node 16.
     set signal(value) {
         assert.object(value);
         this._internals.signal = value;
@@ -9923,7 +10341,7 @@ class Options {
             return this._internals.url.searchParams;
         }
         if (this._internals.searchParams === undefined) {
-            this._internals.searchParams = new external_node_url_.URLSearchParams();
+            this._internals.searchParams = new URLSearchParams();
         }
         return this._internals.searchParams;
     }
@@ -9940,14 +10358,14 @@ class Options {
         const searchParameters = this.searchParams;
         let updated;
         if (dist.string(value)) {
-            updated = new external_node_url_.URLSearchParams(value);
+            updated = new URLSearchParams(value);
         }
-        else if (value instanceof external_node_url_.URLSearchParams) {
+        else if (value instanceof URLSearchParams) {
             updated = value;
         }
         else {
             validateSearchParameters(value);
-            updated = new external_node_url_.URLSearchParams();
+            updated = new URLSearchParams();
             // eslint-disable-next-line guard-for-in
             for (const key in value) {
                 const entry = value[key];
@@ -10825,7 +11243,7 @@ function isUnixSocketURL(url) {
 
 
 
-
+const { buffer: getStreamAsBuffer } = get_stream;
 const supportsBrotli = dist.string(external_node_process_.versions.brotli);
 const methodsWithoutBody = new Set(['GET', 'HEAD']);
 const cacheableStore = new WeakableMap();
@@ -11015,8 +11433,8 @@ class Request extends external_node_stream_.Duplex {
         this.redirectUrls = [];
         this.retryCount = 0;
         this._stopRetry = core_noop;
-        this.on('pipe', source => {
-            if (source.headers) {
+        this.on('pipe', (source) => {
+            if (source?.headers) {
                 Object.assign(this.options.headers, source.headers);
             }
         });
@@ -11072,7 +11490,7 @@ class Request extends external_node_stream_.Duplex {
             else {
                 this.options.signal.addEventListener('abort', abort);
                 this._removeListeners = () => {
-                    this.options.signal.removeEventListener('abort', abort);
+                    this.options.signal?.removeEventListener('abort', abort);
                 };
             }
         }
@@ -11338,7 +11756,7 @@ class Request extends external_node_stream_.Duplex {
                 }
                 const { form } = options;
                 options.form = undefined;
-                options.body = (new external_node_url_.URLSearchParams(form)).toString();
+                options.body = (new URLSearchParams(form)).toString();
             }
             else {
                 if (noContentType) {
@@ -11380,7 +11798,7 @@ class Request extends external_node_stream_.Duplex {
         }
         const statusCode = response.statusCode;
         const typedResponse = response;
-        typedResponse.statusMessage = typedResponse.statusMessage ? typedResponse.statusMessage : external_node_http_.STATUS_CODES[statusCode];
+        typedResponse.statusMessage = typedResponse.statusMessage ?? external_node_http_.STATUS_CODES[statusCode];
         typedResponse.url = options.url.toString();
         typedResponse.requestUrl = this.requestUrl;
         typedResponse.redirectUrls = this.redirectUrls;
@@ -11461,7 +11879,7 @@ class Request extends external_node_stream_.Duplex {
             try {
                 // We need this in order to support UTF-8
                 const redirectBuffer = external_node_buffer_.Buffer.from(response.headers.location, 'binary').toString();
-                const redirectUrl = new external_node_url_.URL(redirectBuffer, url);
+                const redirectUrl = new URL(redirectBuffer, url);
                 if (!isUnixSocketURL(url) && isUnixSocketURL(redirectUrl)) {
                     this._beforeError(new RequestError('Cannot redirect to UNIX socket', {}, this));
                     return;
@@ -11554,7 +11972,10 @@ class Request extends external_node_stream_.Duplex {
         }
         try {
             // Errors are emitted via the `error` event
-            const rawBody = await (0,get_stream.buffer)(from);
+            const rawBody = await getStreamAsBuffer(from);
+            // TODO: Switch to this:
+            // let rawBody = await from.toArray();
+            // rawBody = Buffer.concat(rawBody);
             // On retry Request is destroyed with no error, therefore the above will successfully resolve.
             // So in order to check if this was really successfull, we need to check if it has been properly ended.
             if (!this.isAborted) {
@@ -11648,7 +12069,6 @@ class Request extends external_node_stream_.Duplex {
                     // We only need to implement the error handler in order to support HTTP2 caching.
                     // The result will be a promise anyway.
                     // @ts-expect-error ignore
-                    // eslint-disable-next-line @typescript-eslint/promise-function-async
                     result.once = (event, handler) => {
                         if (event === 'error') {
                             (async () => {
@@ -12356,181 +12776,194 @@ ip_regex_ipRegex.v6 = options => options && options.exact ? v6exact : new RegExp
 
 /* harmony default export */ const ip_regex = (ip_regex_ipRegex);
 
+// EXTERNAL MODULE: external "node:vm"
+var external_node_vm_ = __webpack_require__(714);
+;// CONCATENATED MODULE: ./node_modules/function-timeout/index.js
+
+
+function function_timeout_functionTimeout(function_, {timeout} = {}) {
+	const script = new external_node_vm_.Script('returnValue = function_()');
+
+	const wrappedFunction = (...arguments_) => {
+		const context = {
+			function_: () => function_(...arguments_),
+		};
+
+		script.runInNewContext(context, {timeout});
+
+		return context.returnValue;
+	};
+
+	Object.defineProperty(wrappedFunction, 'name', {
+		value: `functionTimeout(${function_.name || '<anonymous>'})`,
+		configurable: true,
+	});
+
+	return wrappedFunction;
+}
+
+function function_timeout_isTimeoutError(error) {
+	return error?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT';
+}
+
+;// CONCATENATED MODULE: ./node_modules/is-regexp/index.js
+const {toString: is_regexp_toString} = Object.prototype;
+
+function isRegexp(value) {
+	return is_regexp_toString.call(value) === '[object RegExp]';
+}
+
+;// CONCATENATED MODULE: ./node_modules/clone-regexp/index.js
+
+
+const flagMap = {
+	global: 'g',
+	ignoreCase: 'i',
+	multiline: 'm',
+	dotAll: 's',
+	sticky: 'y',
+	unicode: 'u'
+};
+
+function clonedRegexp(regexp, options = {}) {
+	if (!isRegexp(regexp)) {
+		throw new TypeError('Expected a RegExp instance');
+	}
+
+	const flags = Object.keys(flagMap).map(flag => (
+		(typeof options[flag] === 'boolean' ? options[flag] : regexp[flag]) ? flagMap[flag] : ''
+	)).join('');
+
+	const clonedRegexp = new RegExp(options.source || regexp.source, flags);
+
+	clonedRegexp.lastIndex = typeof options.lastIndex === 'number' ?
+		options.lastIndex :
+		regexp.lastIndex;
+
+	return clonedRegexp;
+}
+
+;// CONCATENATED MODULE: ./node_modules/super-regex/index.js
+
+
+ // TODO: Use `structuredClone` instead when targeting Node.js 18.
+
+const resultToMatch = result => ({
+	match: result[0],
+	index: result.index,
+	groups: result.slice(1),
+	namedGroups: result.groups ?? {},
+	input: result.input,
+});
+
+function super_regex_isMatch(regex, string, {timeout} = {}) {
+	try {
+		return function_timeout_functionTimeout(() => clonedRegexp(regex).test(string), {timeout})();
+	} catch (error) {
+		if (function_timeout_isTimeoutError(error)) {
+			return false;
+		}
+
+		throw error;
+	}
+}
+
+function firstMatch(regex, string, {timeout} = {}) {
+	try {
+		const result = functionTimeout(() => cloneRegexp(regex).exec(string), {timeout})();
+
+		if (result === null) {
+			return;
+		}
+
+		return resultToMatch(result);
+	} catch (error) {
+		if (isTimeoutError(error)) {
+			return;
+		}
+
+		throw error;
+	}
+}
+
+function matches(regex, string, {timeout = Number.POSITIVE_INFINITY, matchTimeout = Number.POSITIVE_INFINITY} = {}) {
+	if (!regex.global) {
+		throw new Error('The regex must have the global flag, otherwise, use `firstMatch()` instead');
+	}
+
+	return {
+		* [Symbol.iterator]() {
+			try {
+				const matches = string.matchAll(regex); // The regex is only executed when iterated over.
+
+				while (true) {
+					const nextMatch = functionTimeout(() => matches.next(), {timeout: (timeout !== Number.POSITIVE_INFINITY || matchTimeout !== Number.POSITIVE_INFINITY) ? Math.min(timeout, matchTimeout) : undefined}); // `matches.next` must be called within an arrow function so that it doesn't loose its context.
+
+					const end = timeSpan();
+					const {value, done} = nextMatch();
+					timeout -= Math.ceil(end());
+
+					if (done) {
+						break;
+					}
+
+					yield resultToMatch(value);
+				}
+			} catch (error) {
+				if (!isTimeoutError(error)) {
+					throw error;
+				}
+			}
+		},
+	};
+}
+
 ;// CONCATENATED MODULE: ./node_modules/is-ip/index.js
 
 
+
+const maxIPv4Length = 15;
+const maxIPv6Length = 45;
+
+const options = {
+	timeout: 400,
+};
+
 function isIP(string) {
-	return ipRegex({exact: true}).test(string);
+	if (string.length > maxIPv6Length) {
+		return false;
+	}
+
+	return isMatch(ipRegex({exact: true}), string, options);
 }
 
 function isIPv6(string) {
-	return ip_regex.v6({exact: true}).test(string);
+	if (string.length > maxIPv6Length) {
+		return false;
+	}
+
+	return super_regex_isMatch(ip_regex.v6({exact: true}), string, options);
 }
 
 function isIPv4(string) {
-	return ip_regex.v4({exact: true}).test(string);
+	if (string.length > maxIPv4Length) {
+		return false;
+	}
+
+	return super_regex_isMatch(ip_regex.v4({exact: true}), string, options);
 }
 
 function ipVersion(string) {
-	return isIP(string) ? (isIPv6(string) ? 6 : 4) : undefined;
-}
-
-;// CONCATENATED MODULE: ./node_modules/indent-string/index.js
-function indentString(string, count = 1, options = {}) {
-	const {
-		indent = ' ',
-		includeEmptyLines = false
-	} = options;
-
-	if (typeof string !== 'string') {
-		throw new TypeError(
-			`Expected \`input\` to be a \`string\`, got \`${typeof string}\``
-		);
+	if (isIPv6(string)) {
+		return 6;
 	}
 
-	if (typeof count !== 'number') {
-		throw new TypeError(
-			`Expected \`count\` to be a \`number\`, got \`${typeof count}\``
-		);
-	}
-
-	if (count < 0) {
-		throw new RangeError(
-			`Expected \`count\` to be at least 0, got \`${count}\``
-		);
-	}
-
-	if (typeof indent !== 'string') {
-		throw new TypeError(
-			`Expected \`options.indent\` to be a \`string\`, got \`${typeof indent}\``
-		);
-	}
-
-	if (count === 0) {
-		return string;
-	}
-
-	const regex = includeEmptyLines ? /^/gm : /^(?!\s*$)/gm;
-
-	return string.replace(regex, indent.repeat(count));
-}
-
-// EXTERNAL MODULE: external "os"
-var external_os_ = __webpack_require__(22037);
-;// CONCATENATED MODULE: ./node_modules/escape-string-regexp/index.js
-function escapeStringRegexp(string) {
-	if (typeof string !== 'string') {
-		throw new TypeError('Expected a string');
-	}
-
-	// Escape characters with special meaning either inside or outside character sets.
-	// Use a simple backslash escape when it’s always valid, and a `\xnn` escape when the simpler form would be disallowed by Unicode patterns’ stricter grammar.
-	return string
-		.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
-		.replace(/-/g, '\\x2d');
-}
-
-;// CONCATENATED MODULE: ./node_modules/clean-stack/index.js
-
-
-
-const extractPathRegex = /\s+at.*[(\s](.*)\)?/;
-const pathRegex = /^(?:(?:(?:node|node:[\w/]+|(?:(?:node:)?internal\/[\w/]*|.*node_modules\/(?:babel-polyfill|pirates)\/.*)?\w+)(?:\.js)?:\d+:\d+)|native)/;
-const homeDir = typeof external_os_.homedir === 'undefined' ? '' : external_os_.homedir().replace(/\\/g, '/');
-
-function cleanStack(stack, {pretty = false, basePath} = {}) {
-	const basePathRegex = basePath && new RegExp(`(at | \\()${escapeStringRegexp(basePath.replace(/\\/g, '/'))}`, 'g');
-
-	if (typeof stack !== 'string') {
-		return undefined;
-	}
-
-	return stack.replace(/\\/g, '/')
-		.split('\n')
-		.filter(line => {
-			const pathMatches = line.match(extractPathRegex);
-			if (pathMatches === null || !pathMatches[1]) {
-				return true;
-			}
-
-			const match = pathMatches[1];
-
-			// Electron
-			if (
-				match.includes('.app/Contents/Resources/electron.asar') ||
-				match.includes('.app/Contents/Resources/default_app.asar') ||
-				match.includes('node_modules/electron/dist/resources/electron.asar') ||
-				match.includes('node_modules/electron/dist/resources/default_app.asar')
-			) {
-				return false;
-			}
-
-			return !pathRegex.test(match);
-		})
-		.filter(line => line.trim() !== '')
-		.map(line => {
-			if (basePathRegex) {
-				line = line.replace(basePathRegex, '$1');
-			}
-
-			if (pretty) {
-				line = line.replace(extractPathRegex, (m, p1) => m.replace(p1, p1.replace(homeDir, '~')));
-			}
-
-			return line;
-		})
-		.join('\n');
-}
-
-;// CONCATENATED MODULE: ./node_modules/aggregate-error/index.js
-
-
-
-const cleanInternalStack = stack => stack.replace(/\s+at .*aggregate-error\/index.js:\d+:\d+\)?/g, '');
-
-class AggregateError extends Error {
-	#errors;
-
-	name = 'AggregateError';
-
-	constructor(errors) {
-		if (!Array.isArray(errors)) {
-			throw new TypeError(`Expected input to be an Array, got ${typeof errors}`);
-		}
-
-		errors = errors.map(error => {
-			if (error instanceof Error) {
-				return error;
-			}
-
-			if (error !== null && typeof error === 'object') {
-				// Handle plain error objects with message property and/or possibly other metadata
-				return Object.assign(new Error(error.message), error);
-			}
-
-			return new Error(error);
-		});
-
-		let message = errors
-			.map(error => {
-				// The `stack` property is not standardized, so we can't assume it exists
-				return typeof error.stack === 'string' && error.stack.length > 0 ? cleanInternalStack(cleanStack(error.stack)) : String(error);
-			})
-			.join('\n');
-		message = '\n' + indentString(message, 4);
-		super(message);
-
-		this.#errors = errors;
-	}
-
-	get errors() {
-		return this.#errors.slice();
+	if (isIPv4(string)) {
+		return 4;
 	}
 }
 
 ;// CONCATENATED MODULE: ./node_modules/public-ip/core.js
- // Use built-in when targeting Node.js 16
-
 class IpNotFoundError extends Error {
 	constructor(options) {
 		super('Could not get the public IP address', options);
@@ -12546,6 +12979,10 @@ function createPublicIp(publicIpv4, publicIpv6) {
 		const promise = (async () => {
 			try {
 				const ipv6 = await ipv6Promise;
+
+				// eslint-disable-next-line promise/prefer-await-to-then
+				ipv4Promise.catch(() => {}); // Don't throw when cancelling
+
 				ipv4Promise.cancel();
 				return ipv6;
 			} catch (ipv6Error) {
@@ -12556,7 +12993,7 @@ function createPublicIp(publicIpv4, publicIpv6) {
 				try {
 					return await ipv4Promise;
 				} catch (ipv4Error) {
-					throw new AggregateError([ipv4Error, ipv6Error]);
+					throw new AggregateError([ipv4Error, ipv6Error]); // eslint-disable-line unicorn/error-message
 				}
 			}
 		})();
@@ -12616,7 +13053,7 @@ const dnsServers = [
 			],
 			name: 'o-o.myaddr.l.google.com',
 			type: 'TXT',
-			transform: ip => ip.replace(/"/g, ''),
+			transform: ip => ip.replaceAll('"', ''),
 		},
 		v6: {
 			servers: [
@@ -12627,7 +13064,7 @@ const dnsServers = [
 			],
 			name: 'o-o.myaddr.l.google.com',
 			type: 'TXT',
-			transform: ip => ip.replace(/"/g, ''),
+			transform: ip => ip.replaceAll('"', ''),
 		},
 	},
 ];
@@ -12747,8 +13184,7 @@ const queryHttps = (version, options) => {
 					// eslint-disable-next-line no-await-in-loop
 					const response = await gotPromise;
 
-					const ip = (response.body || '').trim();
-
+					const ip = response.body?.trim();
 					const method = version === 'v6' ? isIPv6 : isIPv4;
 
 					if (ip && method(ip)) {

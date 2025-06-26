@@ -23,5 +23,8 @@
     "@actions/github": "^6.0.1",
     "@aws-sdk/client-ec2": "^3.838.0",
     "public-ip": "^7.0.1"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3"
   }
 }
