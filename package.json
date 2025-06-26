@@ -1,6 +1,6 @@
 {
   "name": "add-ip-to-ec2-security-group",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "Authorize an IP address to an EC2 security group.",
   "main": "index.js",
   "scripts": {
