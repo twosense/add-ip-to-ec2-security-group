@@ -1,6 +1,6 @@
 {
   "name": "add-ip-to-ec2-security-group",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "Authorize an IP address to an EC2 security group.",
   "main": "index.js",
   "scripts": {
@@ -19,12 +19,12 @@
   },
   "homepage": "https://github.com/twosense/add-ip-to-ec2-security-group#readme",
   "dependencies": {
-    "@actions/core": "^1.10.0",
-    "@actions/github": "^5.1.1",
-    "@aws-sdk/client-ec2": "^3.449.0",
-    "public-ip": "^6.0.2"
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@aws-sdk/client-ec2": "^3.838.0",
+    "public-ip": "^7.0.1"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.38.1"
+    "@vercel/ncc": "^0.38.3"
   }
 }
