@@ -3540,7 +3540,7 @@ module.exports = class CachePolicy {
 const {URL} = __webpack_require__(7016);
 const EventEmitter = __webpack_require__(4434);
 const tls = __webpack_require__(4756);
-const http2 = __webpack_require__(5675);
+const http2 = __webpack_require__(8056);
 const QuickLRU = __webpack_require__(5475);
 const delayAsyncDestroy = __webpack_require__(811);
 
@@ -4575,7 +4575,7 @@ module.exports.createResolveProtocol = createResolveProtocol;
 // See https://github.com/facebook/jest/issues/2549
 // eslint-disable-next-line node/prefer-global/url
 const {URL, urlToHttpOptions} = __webpack_require__(7016);
-const http2 = __webpack_require__(5675);
+const http2 = __webpack_require__(8056);
 const {Writable} = __webpack_require__(2203);
 const {Agent, globalAgent} = __webpack_require__(685);
 const IncomingMessage = __webpack_require__(2156);
@@ -5224,7 +5224,7 @@ module.exports = IncomingMessage;
 
 "use strict";
 
-const http2 = __webpack_require__(5675);
+const http2 = __webpack_require__(8056);
 const {
 	Agent,
 	globalAgent
